@@ -1,45 +1,202 @@
-Overview
-========
+# Retail Sales ETL Pipeline
 
-Welcome to Astronomer! This project was generated after you ran 'astro dev init' using the Astronomer CLI. This readme describes the contents of the project, as well as how to run Apache Airflow on your local machine.
+An end-to-end data engineering project that extracts retail sales data from CSV files, transforms and cleans it with Python and pandas, loads it into a PostgreSQL data warehouse, and automates the workflow using Apache Airflow.
 
-Project Contents
-================
+---
 
-Your Astro project contains the following files and folders:
+## Project Overview
 
-- dags: This folder contains the Python files for your Airflow DAGs. By default, this directory includes one example DAG:
-    - `example_astronauts`: This DAG shows a simple ETL pipeline example that queries the list of astronauts currently in space from the Open Notify API and prints a statement for each astronaut. The DAG uses the TaskFlow API to define tasks in Python, and dynamic task mapping to dynamically print a statement for each astronaut. For more on how this DAG works, see our [Getting started tutorial](https://www.astronomer.io/docs/learn/get-started-with-airflow).
-- Dockerfile: This file contains a versioned Astro Runtime Docker image that provides a differentiated Airflow experience. If you want to execute other commands or overrides at runtime, specify them here.
-- include: This folder contains any additional files that you want to include as part of your project. It is empty by default.
-- packages.txt: Install OS-level packages needed for your project by adding them to this file. It is empty by default.
-- requirements.txt: Install Python packages needed for your project by adding them to this file. It is empty by default.
-- plugins: Add custom or community plugins for your project to this file. It is empty by default.
-- airflow_settings.yaml: Use this local-only file to specify Airflow Connections, Variables, and Pools instead of entering them in the Airflow UI as you develop DAGs in this project.
+This project demonstrates a complete ETL pipeline with the following components:
 
-Deploy Your Project Locally
-===========================
+- **Source:** CSV flat files containing retail sales transactions
+- **Transformation:** Python + pandas
+- **Target:** PostgreSQL Data Warehouse (Star Schema)
+- **Orchestration:** Apache Airflow
+- **Environment:** Docker (Astro CLI)
 
-Start Airflow on your local machine by running 'astro dev start'.
+---
 
-This command will spin up five Docker containers on your machine, each for a different Airflow component:
+## Project Structure
 
-- Postgres: Airflow's Metadata Database
-- Scheduler: The Airflow component responsible for monitoring and triggering tasks
-- DAG Processor: The Airflow component responsible for parsing DAGs
-- API Server: The Airflow component responsible for serving the Airflow UI and API
-- Triggerer: The Airflow component responsible for triggering deferred tasks
+```
+retail_dwh_project/
+├── dags/
+│   └── retail_sales_etl.py        ← Airflow DAG (7 tasks)
+├── data/
+│   ├── sales_2025_01.csv          ← Source CSV files
+│   ├── sales_2025_02.csv
+│   ├── sales_2025_03.csv
+│   └── archive/                   ← Processed files moved here
+├── include/
+│   ├── transform_helpers.py       ← ETL logic (extract, clean, transform)
+│   └── sql/
+│       └── create_dw_tables.sql   ← SQL to create all DW tables
+├── postgres/
+│   └── init/
+│       └── init_db.sql            ← Creates retail_dwh DB on first start
+├── requirements.txt
+├── Dockerfile
+└── README.md
+```
 
-When all five containers are ready the command will open the browser to the Airflow UI at http://localhost:8080/. You should also be able to access your Postgres Database at 'localhost:5432/postgres' with username 'postgres' and password 'postgres'.
+---
 
-Note: If you already have either of the above ports allocated, you can either [stop your existing Docker containers or change the port](https://www.astronomer.io/docs/astro/cli/troubleshoot-locally#ports-are-not-available-for-my-local-airflow-webserver).
+## Data Warehouse Schema (Star Schema)
 
-Deploy Your Project to Astronomer
-=================================
+The warehouse follows a Star Schema design with two logical schemas:
 
-If you have an Astronomer account, pushing code to a Deployment on Astronomer is simple. For deploying instructions, refer to Astronomer documentation: https://www.astronomer.io/docs/astro/deploy-code/
+### Staging Schema
+| Table | Description |
+|---|---|
+| `staging.stg_sales` | Raw cleaned data with row_num, source_file, batch_id |
 
-Contact
-=======
+### DWH Schema
+| Table | Description |
+|---|---|
+| `dwh.dim_customer` | Customer dimension (SCD Type 2) |
+| `dwh.dim_product` | Product dimension (SCD Type 2) |
+| `dwh.dim_date` | Date dimension |
+| `dwh.fact_sales` | Sales fact table |
 
-The Astronomer CLI is maintained with love by the Astronomer team. To report a bug or suggest a change, reach out to our support.
+### SCD Type 2
+Implemented for `dwh.dim_customer` and `dwh.dim_product`.
+Tracked columns: `effective_from`, `effective_to`, `is_current`
+
+---
+
+## ETL Pipeline (Airflow DAG)
+
+```
+create_dw_objects
+       ↓
+extract_and_clean
+       ↓
+  load_staging
+       ↓
+ load_dimensions
+       ↓
+   load_fact
+       ↓
+ data_quality
+       ↓
+archive_source_files
+```
+
+| Task | Description |
+|---|---|
+| `create_dw_objects` | Creates schemas and tables if they do not exist |
+| `extract_and_clean` | Reads CSV files, cleans data, calculates derived columns |
+| `load_staging` | Loads cleaned batch into `staging.stg_sales` |
+| `load_dimensions` | Loads dimensions and applies SCD Type 2 logic |
+| `load_fact` | Loads rows into `dwh.fact_sales` using surrogate keys |
+| `data_quality` | Validates row counts, NULLs, and orphan keys |
+| `archive_source_files` | Moves processed CSV files to `data/archive/` |
+
+---
+
+## Data Cleaning Steps
+
+| Issue | Solution |
+|---|---|
+| Duplicate rows | `drop_duplicates()` |
+| NULL in critical columns | `dropna(subset=[critical_cols])` |
+| Bad dates | `pd.to_datetime(errors='coerce')` |
+| Zero/negative quantity | Filter `quantity > 0` |
+| Whitespace in text | `.str.strip()` |
+| Inconsistent capitalization | `.str.title()` |
+| Missing calculated fields | Derive `sales_amount`, `total_cost`, `profit_amount` |
+
+---
+
+## Tools and Technologies
+
+- **Python** — ETL scripting
+- **Pandas** — Data cleaning and transformation
+- **PostgreSQL** — Data Warehouse
+- **Apache Airflow** — Workflow orchestration
+- **Docker / Astro CLI** — Containerized environment
+- **SQL** — Schema creation and warehouse loading
+
+---
+
+## How to Run
+
+### Prerequisites
+- Docker Desktop
+- Astro CLI
+
+### Steps
+
+**1. Clone the repository**
+```bash
+git clone https://github.com/wafaa-mahmoud44/retail-sales-etl.git
+cd retail-sales-etl
+```
+
+**2. Start the environment**
+```bash
+astro dev start
+```
+
+**3. Open Airflow UI**
+```
+http://localhost:8080
+```
+
+**4. Add PostgreSQL Connection in Airflow UI**
+- Conn Id: `retail_dwh`
+- Conn Type: `Postgres`
+- Host: `postgres`
+- Database: `retail_dwh`
+- Login: `postgres`
+- Password: `postgres`
+- Port: `5432`
+
+**5. Add source CSV files**
+```
+data/
+```
+
+**6. Trigger the DAG**
+```
+retail_sales_etl
+```
+
+---
+
+## Sample Validation Queries
+
+```sql
+-- Check row counts
+SELECT COUNT(*) FROM staging.stg_sales;
+SELECT COUNT(*) FROM dwh.dim_customer;
+SELECT COUNT(*) FROM dwh.dim_product;
+SELECT COUNT(*) FROM dwh.dim_date;
+SELECT COUNT(*) FROM dwh.fact_sales;
+
+-- Sales by category
+SELECT p.category,
+       SUM(f.sales_amount) AS total_sales,
+       SUM(f.profit_amount) AS total_profit
+FROM dwh.fact_sales f
+JOIN dwh.dim_product p ON f.product_key = p.product_key
+GROUP BY p.category
+ORDER BY total_sales DESC;
+
+-- Check SCD Type 2 history
+SELECT customer_id, customer_name, city,
+       effective_from, effective_to, is_current
+FROM dwh.dim_customer
+ORDER BY customer_id, effective_from;
+```
+
+---
+
+## Future Improvements
+
+- Add file hash tracking to prevent duplicate loads
+- Build dashboards with Power BI or Tableau
+- Add audit and metadata tables
+- Integrate dbt for transformation and modeling
+- Deploy to cloud environment (AWS/GCP)
+- Extend to full medallion architecture
