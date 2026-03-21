@@ -66,6 +66,8 @@ Tracked columns: `effective_from`, `effective_to`, `is_current`
 
 ## ETL Pipeline (Airflow DAG)
 
+![yyyyyyyyy](https://github.com/user-attachments/assets/acde2fcf-7b19-4b6b-b510-b2aee43061c6)
+
 ```
 create_dw_objects
        ↓
