@@ -2,17 +2,42 @@
 
 An end-to-end data engineering project that extracts retail sales data from CSV files, transforms and cleans it with Python and pandas, loads it into a PostgreSQL data warehouse, and automates the workflow using Apache Airflow.
 
+Designed with production-like practices including staging layer, SCD Type 2, and data quality validation.
+
 ---
 
-## Project Overview
+## Architecture
 
-This project demonstrates a complete ETL pipeline with the following components:
+```
+        CSV Files
+            │
+            ▼
+   Python (Pandas)
+   Cleaning & Transform
+            │
+            ▼
+      Staging Layer
+      (stg_sales)
+            │
+            ▼
+     Data Warehouse
+   (Star Schema - DWH)
+            │
+            ▼
+        Analytics
 
-- **Source:** CSV flat files containing retail sales transactions
-- **Transformation:** Python + pandas
-- **Target:** PostgreSQL Data Warehouse (Star Schema)
-- **Orchestration:** Apache Airflow
-- **Environment:** Docker (Astro CLI)
+        ─────────────
+        Apache Airflow
+        (Orchestration)
+
+
+```
+
+---
+
+## Airflow DAG — All Tasks Success ✅
+
+![airflow_dag](https://github.com/user-attachments/assets/16c88cc1-a38c-4166-be69-62d62ebd08de)
 
 ---
 
@@ -23,17 +48,17 @@ retail_dwh_project/
 ├── dags/
 │   └── retail_sales_etl.py        ← Airflow DAG (7 tasks)
 ├── data/
-│   ├── sales_2025_01.csv          ← Source CSV files
+│   ├── sales_2025_01.csv
 │   ├── sales_2025_02.csv
 │   ├── sales_2025_03.csv
 │   └── archive/                   ← Processed files moved here
 ├── include/
-│   ├── transform_helpers.py       ← ETL logic (extract, clean, transform)
+│   ├── transform_helpers.py       ← ETL logic
 │   └── sql/
-│       └── create_dw_tables.sql   ← SQL to create all DW tables
+│       └── create_dw_tables.sql   ← DW schema creation
 ├── postgres/
 │   └── init/
-│       └── init_db.sql            ← Creates retail_dwh DB on first start
+│       └── init_db.sql
 ├── requirements.txt
 ├── Dockerfile
 └── README.md
@@ -43,18 +68,16 @@ retail_dwh_project/
 
 ## Data Warehouse Schema (Star Schema)
 
-The warehouse follows a Star Schema design with two logical schemas:
-
 ### Staging Schema
 | Table | Description |
 |---|---|
-| `staging.stg_sales` | Raw cleaned data with row_num, source_file, batch_id |
+| `staging.stg_sales` | Raw cleaned data with `row_num`, `source_file`, `batch_id` |
 
 ### DWH Schema
 | Table | Description |
 |---|---|
-| `dwh.dim_customer` | Customer dimension (SCD Type 2) |
-| `dwh.dim_product` | Product dimension (SCD Type 2) |
+| `dwh.dim_customer` | Customer dimension — SCD Type 2 |
+| `dwh.dim_product` | Product dimension — SCD Type 2 |
 | `dwh.dim_date` | Date dimension |
 | `dwh.fact_sales` | Sales fact table |
 
@@ -64,9 +87,7 @@ Tracked columns: `effective_from`, `effective_to`, `is_current`
 
 ---
 
-## ETL Pipeline (Airflow DAG)
-
-![airflow_dag](https://github.com/user-attachments/assets/c398d6e9-0438-4a9f-ba4f-377b847f0a4e)
+## ETL Pipeline Tasks
 
 | Task | Description |
 |---|---|
@@ -94,14 +115,26 @@ Tracked columns: `effective_from`, `effective_to`, `is_current`
 
 ---
 
+## 📈 Results
+
+- Automated a manual data processing workflow across multiple monthly CSV files
+- Improved data consistency through validation and quality checks
+- Enabled analytical queries using a structured star schema
+- Preserved historical changes in customer and product data using SCD Type 2
+- Reduced data processing errors through staging layer separation
+
+---
+
 ## Tools and Technologies
 
-- **Python** — ETL scripting
-- **Pandas** — Data cleaning and transformation
-- **PostgreSQL** — Data Warehouse
-- **Apache Airflow** — Workflow orchestration
-- **Docker / Astro CLI** — Containerized environment
-- **SQL** — Schema creation and warehouse loading
+| Tool | Purpose |
+|---|---|
+| Python | ETL scripting |
+| Pandas | Data cleaning and transformation |
+| PostgreSQL | Data Warehouse |
+| Apache Airflow | Workflow orchestration |
+| Docker / Astro CLI | Containerized environment |
+| SQL | Schema creation and warehouse loading |
 
 ---
 
@@ -138,15 +171,9 @@ http://localhost:8080
 - Password: `postgres`
 - Port: `5432`
 
-**5. Add source CSV files**
-```
-data/
-```
+**5. Add source CSV files to `data/` folder**
 
-**6. Trigger the DAG**
-```
-retail_sales_etl
-```
+**6. Trigger the DAG:** `retail_sales_etl`
 
 ---
 
