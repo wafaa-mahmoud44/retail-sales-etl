@@ -1,0 +1,6 @@
+postgres:
+    port: "5433"
+project:
+    name: retail_dwh_project
+webserver:
+    port: "8081"
